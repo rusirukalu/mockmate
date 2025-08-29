@@ -16,10 +16,12 @@ model User {
   id               String            @id @default(uuid())
   email            String            @unique
   name             String?
+  emailVerified    DateTime?
+  image            String?
   sessions         Session[]
   progress         Progress?
   accounts         Account[]
-  practiceSessions PracticeSession[] // Opposite relation field added
+  practiceSessions PracticeSession[]
 }
 
 model Account {
@@ -75,7 +77,6 @@ model Progress {
   avgTime       Int    @default(0)
 }
 
-// App-specific Session (rename if wanted to InterviewSession, etc)
 model PracticeSession {
   id           String   @id @default(uuid())
   user         User?    @relation(fields: [userId], references: [id])
