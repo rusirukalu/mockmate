@@ -14,7 +14,27 @@ export async function getGeminiFeedback(question: string, answer: string) {
             parts: [
               {
                 text:
-                  `You're an expert interview coach. Here's the question:\n"${question}"\n\nAnswer:\n"${answer}"\n\nProvide feedback as markdown bullets. Say what was done well and what could be improved.`
+`You are a seasoned mock interview coach.
+Provide detailed feedback for this candidate's answer.
+
+Question:
+${question}
+
+Candidate Answer:
+${answer}
+
+Return as markdown:
+
+## Strengths
+- List 1-3 things done well.
+
+## Areas to Improve
+- List 1-3 things that could be better.
+
+## Sample Answer
+- (Give one brief model response, in 2-5 sentences, suitable for a human interviewer.)
+
+If the answer is very incomplete, give gentle advice and show a full sample.`
               }
             ]
           }
@@ -24,7 +44,6 @@ export async function getGeminiFeedback(question: string, answer: string) {
   );
 
   const data = await res.json();
-  // Defensive parsing (API may change format)
   const feedback =
     data?.candidates?.[0]?.content?.parts?.[0]?.text ??
     data?.candidates?.[0]?.output ??

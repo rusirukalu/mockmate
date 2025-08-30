@@ -1,47 +1,150 @@
-// app/practice/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import Recorder from "@/app/components/features/Recorder";
 import MarkdownFeedback from "@/app/components/features/MarkdownFeedback";
 
-const sampleQuestions = [
-  { id: 1, text: "Tell me about yourself." },
-  { id: 2, text: "Describe a technical challenge you faced." },
-  { id: 3, text: "How do you handle tight deadlines?" },
+// Starter bank—can later migrate to DB or API!
+const starterQuestions = [
+  {
+    id: 1,
+    text: "Tell me about yourself.",
+    category: "Behavioral",
+    difficulty: "Easy",
+  },
+  {
+    id: 2,
+    text: "Describe a technical challenge you faced.",
+    category: "Technical",
+    difficulty: "Medium",
+  },
+  {
+    id: 3,
+    text: "How do you handle tight deadlines?",
+    category: "Behavioral",
+    difficulty: "Medium",
+  },
+  {
+    id: 4,
+    text: "Explain a complex system you designed.",
+    category: "System Design",
+    difficulty: "Hard",
+  },
+  {
+    id: 5,
+    text: "How would you debug a memory leak in production?",
+    category: "Technical",
+    difficulty: "Hard",
+  },
 ];
 
+const DIFFICULTIES = ["Easy", "Medium", "Hard"];
+const CATEGORIES = ["Behavioral", "Technical", "System Design"];
+
+// ---------- Helper to save session to history ----------
+function saveSessionToHistory({
+  question,
+  category,
+  difficulty,
+  videoUrl,
+  answer,
+  aiFeedback,
+}: {
+  question: string;
+  category: string;
+  difficulty: string;
+  videoUrl?: string;
+  answer: string;
+  aiFeedback: string;
+}) {
+  if (typeof window === "undefined") return;
+  const stored = localStorage.getItem("practice-history");
+  const sessions = stored ? JSON.parse(stored) : [];
+  sessions.push({
+    timestamp: Date.now(),
+    question,
+    category,
+    difficulty,
+    videoUrl,
+    answer,
+    aiFeedback,
+  });
+  localStorage.setItem("practice-history", JSON.stringify(sessions));
+}
+
 export default function Practice() {
+  const [customQuestions, setCustomQuestions] = useState<
+    { id: number; text: string; category: string; difficulty: string }[]
+  >([]);
+
+  const [filterDifficulty, setFilterDifficulty] = useState<string | "">("");
+  const [filterCategory, setFilterCategory] = useState<string | "">("");
   const [started, setStarted] = useState(false);
   const [seconds, setSeconds] = useState(60);
-  const [question, setQuestion] = useState<{ id: number; text: string } | null>(
-    null
-  );
+  const [question, setQuestion] = useState<{
+    id: number;
+    text: string;
+    category: string;
+    difficulty: string;
+  } | null>(null);
+
+  // AI Feedback State
   const [answer, setAnswer] = useState("");
   const [aiFeedback, setAIFeedback] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [feedbackErr, setFeedbackErr] = useState("");
 
-  // Countdown timer with smooth updates
+  // Track latest video blob URL
+  const [lastRecordingUrl, setLastRecordingUrl] = useState<
+    string | undefined
+  >();
+
+  // --- Custom question adding ---
+  const [newQ, setNewQ] = useState("");
+  const [newQCat, setNewQCat] = useState(CATEGORIES[0]);
+  const [newQDiff, setNewQDiff] = useState(DIFFICULTIES[0]);
+
+  // Persist custom questions per user session (optional)
   useEffect(() => {
-    if (!started || seconds === 0) return;
-    const timer = setInterval(
-      () => setSeconds((s) => Math.max(0, s - 1)),
-      1000
-    );
+    const stored =
+      typeof window !== "undefined"
+        ? localStorage.getItem("custom-questions")
+        : null;
+    if (stored) setCustomQuestions(JSON.parse(stored));
+  }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined")
+      localStorage.setItem("custom-questions", JSON.stringify(customQuestions));
+  }, [customQuestions]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (!started) return;
+    if (seconds === 0) return;
+    const timer = setInterval(() => {
+      setSeconds((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
     return () => clearInterval(timer);
   }, [started, seconds]);
 
-  // Pick question on start
+  // Pick a filtered question when session starts
   useEffect(() => {
     if (started && !question) {
-      setQuestion(
-        sampleQuestions[Math.floor(Math.random() * sampleQuestions.length)]
+      const allQuestions = [...starterQuestions, ...customQuestions];
+      const choices = allQuestions.filter(
+        (q) =>
+          (!filterCategory || q.category === filterCategory) &&
+          (!filterDifficulty || q.difficulty === filterDifficulty)
       );
+      const pick = choices.length
+        ? choices[Math.floor(Math.random() * choices.length)]
+        : null;
+      setQuestion(pick || null);
       setAnswer("");
       setAIFeedback(null);
       setFeedbackErr("");
+      setLastRecordingUrl(undefined);
     }
-  }, [started, question]);
+  }, [started, question, filterCategory, filterDifficulty, customQuestions]);
 
   function handleReset() {
     setStarted(false);
@@ -50,18 +153,20 @@ export default function Practice() {
     setAnswer("");
     setAIFeedback(null);
     setFeedbackErr("");
+    setLastRecordingUrl(undefined);
   }
 
+  // --- SAVE session after feedback ---
   async function handleAIFeedback() {
     if (!question || !answer.trim()) {
-      setFeedbackErr("Please provide your answer before requesting feedback.");
+      setFeedbackErr(
+        "Type or transcribe your answer before requesting AI feedback."
+      );
       return;
     }
-
     setIsLoading(true);
     setFeedbackErr("");
     setAIFeedback(null);
-
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
@@ -71,10 +176,18 @@ export default function Practice() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to get feedback");
       setAIFeedback(data.feedback);
+
+      // SAVE SESSION TO HISTORY after AI feedback
+      saveSessionToHistory({
+        question: question.text,
+        category: question.category,
+        difficulty: question.difficulty,
+        videoUrl: lastRecordingUrl,
+        answer,
+        aiFeedback: data.feedback,
+      });
     } catch (e: any) {
-      setFeedbackErr(
-        e.message || "Error getting AI feedback. Please try again."
-      );
+      setFeedbackErr(e.message || "Error contacting AI service.");
     } finally {
       setIsLoading(false);
     }
@@ -84,146 +197,183 @@ export default function Practice() {
     setAnswer(transcript);
   }
 
-  const timeColor =
-    seconds <= 10
-      ? "text-red-500"
-      : seconds <= 30
-      ? "text-amber-500"
-      : "text-green-600";
-  const isSessionComplete = seconds === 0 && started;
+  // Add new custom question (with basic validation)
+  function handleAddCustomQ(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = newQ.trim();
+    if (!trimmed) return;
+    setCustomQuestions((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        text: trimmed,
+        category: newQCat,
+        difficulty: newQDiff,
+      },
+    ]);
+    setNewQ("");
+  }
 
   return (
-    <div className="min-h-screen mt-10 bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-6">
-        <div className="bg-white rounded-xl shadow-sm border p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-            Mock Interview Practice
-          </h1>
+    <div className="p-8 max-w-md mx-auto">
+      <h1 className="text-xl font-bold mb-4">Mock Interview Practice</h1>
 
-          {!started ? (
-            <div className="text-center space-y-6">
-              <p className="text-gray-600 text-lg">
-                Ready to practice your interview skills?
-              </p>
-              <button
-                onClick={() => setStarted(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors shadow-sm"
+      {/* -- Customization Controls -- */}
+      {!started && (
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 flex-wrap">
+            <label className="font-semibold">
+              Difficulty:
+              <select
+                value={filterDifficulty}
+                onChange={(e) => setFilterDifficulty(e.target.value)}
+                className="ml-2 border rounded px-2 py-1"
               >
-                Start Interview Session
+                <option value="">Any</option>
+                {DIFFICULTIES.map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
+              </select>
+            </label>
+            <label className="font-semibold">
+              Category:
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="ml-2 border rounded px-2 py-1"
+              >
+                <option value="">Any</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <form
+            className="flex flex-col gap-2 mt-2"
+            onSubmit={handleAddCustomQ}
+          >
+            <h3 className="font-semibold text-base">Add Your Own Question</h3>
+            <input
+              type="text"
+              placeholder="e.g. Pitch yourself in 30 seconds"
+              value={newQ}
+              onChange={(e) => setNewQ(e.target.value)}
+              className="border rounded px-2 py-1"
+            />
+            <div className="flex gap-2">
+              <select
+                value={newQCat}
+                onChange={(e) => setNewQCat(e.target.value)}
+                className="border rounded px-2 py-1"
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+              <select
+                value={newQDiff}
+                onChange={(e) => setNewQDiff(e.target.value)}
+                className="border rounded px-2 py-1"
+              >
+                {DIFFICULTIES.map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
+              </select>
+              <button className="btn btn-secondary px-3" type="submit">
+                + Add
               </button>
             </div>
+          </form>
+        </div>
+      )}
+
+      {!started ? (
+        <button
+          onClick={() => {
+            setStarted(true);
+            setSeconds(60);
+          }}
+          className="btn btn-primary my-4"
+        >
+          Start Session
+        </button>
+      ) : (
+        <div className="space-y-4">
+          <div className="text-lg font-semibold">Time left: {seconds}s</div>
+          {question ? (
+            <div className="mb-3 p-3 bg-gray-100 rounded shadow-inner border">
+              <div>
+                <span className="font-medium">Question:</span>{" "}
+                <span className="inline-block bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-xs ml-1">
+                  {question.category}
+                </span>
+                <span className="inline-block bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs ml-1">
+                  {question.difficulty}
+                </span>
+              </div>
+              <div className="mt-1">{question.text}</div>
+            </div>
           ) : (
-            <div className="space-y-6">
-              {/* Timer with enhanced styling */}
-              <div className="text-center">
-                <div
-                  className={`text-4xl font-bold ${timeColor} transition-colors`}
-                >
-                  {Math.floor(seconds / 60)}:
-                  {(seconds % 60).toString().padStart(2, "0")}
-                </div>
-                <div className="text-sm text-gray-500 mt-1">Time remaining</div>
+            <div className="text-red-600 font-semibold">
+              No questions match your filters. Add custom or reset filters.
+            </div>
+          )}
+
+          <Recorder
+            onTranscript={handleTranscript}
+            onSave={(blob) => {
+              setLastRecordingUrl(URL.createObjectURL(blob));
+            }}
+          />
+          <div className="flex flex-col gap-2 mt-4">
+            <label className="font-mono font-semibold" htmlFor="ai-answer">
+              Type or auto-transcribe your answer for AI feedback:
+            </label>
+            <textarea
+              id="ai-answer"
+              rows={4}
+              className="border rounded p-2 font-mono"
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              placeholder="e.g. My name is... In my previous job..."
+              disabled={seconds > 0 && started}
+            />
+
+            <button
+              className="btn btn-blue"
+              onClick={handleAIFeedback}
+              disabled={isLoading || !answer.trim() || !question}
+            >
+              {isLoading ? "Getting AI Feedback..." : "Get AI Feedback"}
+            </button>
+            {feedbackErr && <div className="text-red-600">{feedbackErr}</div>}
+            {aiFeedback && (
+              <div className="bg-gray-50 border rounded p-3 mt-2 prose max-w-none">
+                <h3 className="font-semibold text-base mb-1">AI Feedback:</h3>
+                <MarkdownFeedback markdown={aiFeedback} />
               </div>
-
-              {/* Question card with better visual treatment */}
-              {question && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold flex-shrink-0">
-                      Q
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 mb-2">
-                        Interview Question
-                      </h3>
-                      <p className="text-gray-800 text-lg leading-relaxed">
-                        {question.text}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Recorder component */}
-              <Recorder onTranscript={handleTranscript} />
-
-              {/* Answer input with improved UX */}
-              <div className="space-y-3">
-                <label
-                  htmlFor="ai-answer"
-                  className="block font-semibold text-gray-900"
-                >
-                  Your Answer
-                </label>
-                <textarea
-                  id="ai-answer"
-                  rows={6}
-                  className="w-full border border-gray-300 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-shadow"
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="Type your answer here or use voice recording above..."
-                  disabled={seconds > 0 && started}
-                />
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleAIFeedback}
-                    disabled={isLoading || !answer.trim()}
-                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-                  >
-                    {isLoading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Analyzing...
-                      </>
-                    ) : (
-                      "Get AI Feedback"
-                    )}
-                  </button>
-
-                  <button
-                    onClick={handleReset}
-                    className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                  >
-                    Reset
-                  </button>
-                </div>
-
-                {/* Error message with better styling */}
-                {feedbackErr && (
-                  <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
-                    {feedbackErr}
-                  </div>
-                )}
-
-                {/* AI Feedback with enhanced presentation */}
-                {aiFeedback && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-6 mt-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                        AI
-                      </div>
-                      <h3 className="font-bold text-green-900">
-                        Feedback & Suggestions
-                      </h3>
-                    </div>
-                    <div className="prose prose-sm max-w-none text-gray-800">
-                      <MarkdownFeedback markdown={aiFeedback} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Session complete message */}
-              {isSessionComplete && (
-                <div className="bg-blue-50 border border-blue-200 text-blue-800 px-6 py-4 rounded-lg text-center font-semibold">
-                  🎉 Session Complete! Review your answer and get feedback
-                  above.
-                </div>
-              )}
+            )}
+          </div>
+          <button onClick={handleReset} className="btn btn-light mt-2">
+            Reset Session
+          </button>
+          {seconds === 0 && (
+            <div className="mt-2 text-green-600 font-bold">
+              Session complete! Review your recording above.
             </div>
           )}
         </div>
+      )}
+      {/* Optional: History link for navigation */}
+      <div className="mt-6 text-right">
+        <a
+          href="/practice/history"
+          className="text-blue-700 underline hover:text-blue-900 font-medium"
+        >
+          View History
+        </a>
       </div>
     </div>
   );
