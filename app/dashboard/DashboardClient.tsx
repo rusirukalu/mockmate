@@ -14,6 +14,7 @@ import {
   Cell,
 } from "recharts";
 import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import MarkdownFeedback from "@/app/components/features/MarkdownFeedback";
 
 // Helper to get history from localStorage
@@ -155,6 +156,25 @@ export default function DashboardClient({ userEmail }: { userEmail: string }) {
             Review All Sessions
           </a>
         </div>
+
+        {/* Delete All Practice History Button */}
+        <Button
+          onClick={() => {
+            if (
+              window.confirm(
+                "Delete ALL your practice history? This cannot be undone."
+              )
+            ) {
+              localStorage.removeItem("practice-history");
+              window.location.reload();
+            }
+          }}
+          variant="outline"
+          className="mt-5 py-2 px-4 rounded bg-red-50 border border-red-600 text-red-800 font-medium hover:bg-red-100"
+          aria-label="Delete all practice data"
+        >
+          Delete All Practice History
+        </Button>
       </section>
 
       <div className="grid gap-8 md:grid-cols-2 mb-8">
