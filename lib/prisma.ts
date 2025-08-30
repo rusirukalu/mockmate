@@ -2,7 +2,7 @@
 import { PrismaClient } from "@prisma/client"
 
 declare global {
-  // Allow global `prisma` to avoid multiple instantiations in dev
+  // allow global `prisma` in dev to avoid multiple instantiations on hot reload
   // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined
 }
@@ -10,7 +10,11 @@ declare global {
 export const prisma =
   global.prisma ||
   new PrismaClient({
-    log: ["info", "warn", "error"],
+    log: ["warn", "error"], // keep only warnings & errors (no query spam)
+    errorFormat: "pretty",  // nicer stack traces on Prisma errors
   })
 
-if (process.env.NODE_ENV !== "production") global.prisma = prisma
+// ensure singleton in dev
+if (process.env.NODE_ENV !== "production") {
+  global.prisma = prisma
+}
