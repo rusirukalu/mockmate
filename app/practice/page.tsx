@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import Recorder from "@/app/components/features/Recorder";
 import MarkdownFeedback from "@/app/components/features/MarkdownFeedback";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 // Starter bank—can later migrate to DB or API!
 const starterQuestions = [
@@ -368,12 +370,9 @@ export default function Practice() {
       )}
       {/* Optional: History link for navigation */}
       <div className="mt-6 text-right">
-        <a
-          href="/practice/history"
-          className="text-blue-700 underline hover:text-blue-900 font-medium"
-        >
-          View History
-        </a>
+        <Button asChild variant="outline">
+          <Link href="/practice/history">View History</Link>
+        </Button>
       </div>
     </div>
   );
