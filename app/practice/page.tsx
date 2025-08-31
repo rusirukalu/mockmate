@@ -1,9 +1,22 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Recorder from "@/app/components/features/Recorder";
 import MarkdownFeedback from "@/app/components/features/MarkdownFeedback";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Starter bank—can later migrate to DB or API!
 const starterQuestions = [
@@ -78,8 +91,8 @@ export default function Practice() {
     { id: number; text: string; category: string; difficulty: string }[]
   >([]);
 
-  const [filterDifficulty, setFilterDifficulty] = useState<string | "">("");
-  const [filterCategory, setFilterCategory] = useState<string | "">("");
+  const [filterDifficulty, setFilterDifficulty] = useState<string>("any");
+  const [filterCategory, setFilterCategory] = useState<string>("any");
   const [started, setStarted] = useState(false);
   const [seconds, setSeconds] = useState(60);
   const [question, setQuestion] = useState<{
@@ -104,6 +117,9 @@ export default function Practice() {
   const [newQ, setNewQ] = useState("");
   const [newQCat, setNewQCat] = useState(CATEGORIES[0]);
   const [newQDiff, setNewQDiff] = useState(DIFFICULTIES[0]);
+
+  // Ref for Textarea auto-focus
+  const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Persist custom questions per user session (optional)
   useEffect(() => {
@@ -134,8 +150,8 @@ export default function Practice() {
       const allQuestions = [...starterQuestions, ...customQuestions];
       const choices = allQuestions.filter(
         (q) =>
-          (!filterCategory || q.category === filterCategory) &&
-          (!filterDifficulty || q.difficulty === filterDifficulty)
+          (filterCategory === "any" || q.category === filterCategory) &&
+          (filterDifficulty === "any" || q.difficulty === filterDifficulty)
       );
       const pick = choices.length
         ? choices[Math.floor(Math.random() * choices.length)]
@@ -147,6 +163,13 @@ export default function Practice() {
       setLastRecordingUrl(undefined);
     }
   }, [started, question, filterCategory, filterDifficulty, customQuestions]);
+
+  // Auto-focus Textarea when session starts
+  useEffect(() => {
+    if (started && textAreaRef.current) {
+      textAreaRef.current.focus();
+    }
+  }, [started]);
 
   function handleReset() {
     setStarted(false);
@@ -216,163 +239,269 @@ export default function Practice() {
     setNewQ("");
   }
 
+  const timeColor =
+    seconds <= 10
+      ? "text-red-500"
+      : seconds <= 30
+      ? "text-amber-500"
+      : "text-green-600";
+
   return (
-    <div className="p-8 max-w-md mx-auto">
-      <h1 className="text-xl font-bold mb-4">Mock Interview Practice</h1>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-2xl mx-auto px-6">
+        <div className="bg-white rounded-xl shadow-sm border p-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
+            Mock Interview Practice
+          </h1>
 
-      {/* -- Customization Controls -- */}
-      {!started && (
-        <div className="mb-6 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 flex-wrap">
-            <label className="font-semibold">
-              Difficulty:
-              <select
-                value={filterDifficulty}
-                onChange={(e) => setFilterDifficulty(e.target.value)}
-                className="ml-2 border rounded px-2 py-1"
-              >
-                <option value="">Any</option>
-                {DIFFICULTIES.map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
-              </select>
-            </label>
-            <label className="font-semibold">
-              Category:
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="ml-2 border rounded px-2 py-1"
-              >
-                <option value="">Any</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+          {/* -- Customization Controls -- */}
+          {!started && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="text-lg">
+                  Customize Your Practice
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="difficulty-select">Difficulty:</Label>
+                    <Select
+                      value={filterDifficulty}
+                      onValueChange={setFilterDifficulty}
+                    >
+                      <SelectTrigger
+                        id="difficulty-select"
+                        className="w-[120px]"
+                      >
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        {DIFFICULTIES.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-          <form
-            className="flex flex-col gap-2 mt-2"
-            onSubmit={handleAddCustomQ}
-          >
-            <h3 className="font-semibold text-base">Add Your Own Question</h3>
-            <input
-              type="text"
-              placeholder="e.g. Pitch yourself in 30 seconds"
-              value={newQ}
-              onChange={(e) => setNewQ(e.target.value)}
-              className="border rounded px-2 py-1"
-            />
-            <div className="flex gap-2">
-              <select
-                value={newQCat}
-                onChange={(e) => setNewQCat(e.target.value)}
-                className="border rounded px-2 py-1"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-              <select
-                value={newQDiff}
-                onChange={(e) => setNewQDiff(e.target.value)}
-                className="border rounded px-2 py-1"
-              >
-                {DIFFICULTIES.map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
-              </select>
-              <button className="btn btn-secondary px-3" type="submit">
-                + Add
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+                  <div className="space-y-2">
+                    <Label htmlFor="category-select">Category:</Label>
+                    <Select
+                      value={filterCategory}
+                      onValueChange={setFilterCategory}
+                    >
+                      <SelectTrigger id="category-select" className="w-[140px]">
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        {CATEGORIES.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-      {!started ? (
-        <button
-          onClick={() => {
-            setStarted(true);
-            setSeconds(60);
-          }}
-          className="btn btn-primary my-4"
-        >
-          Start Session
-        </button>
-      ) : (
-        <div className="space-y-4">
-          <div className="text-lg font-semibold">Time left: {seconds}s</div>
-          {question ? (
-            <div className="mb-3 p-3 bg-gray-100 rounded shadow-inner border">
-              <div>
-                <span className="font-medium">Question:</span>{" "}
-                <span className="inline-block bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-xs ml-1">
-                  {question.category}
-                </span>
-                <span className="inline-block bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs ml-1">
-                  {question.difficulty}
-                </span>
-              </div>
-              <div className="mt-1">{question.text}</div>
+                <form onSubmit={handleAddCustomQ} className="space-y-3">
+                  <Label className="text-base font-semibold">
+                    Add Your Own Question
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Pitch yourself in 30 seconds"
+                    value={newQ}
+                    onChange={(e) => setNewQ(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Select value={newQCat} onValueChange={setNewQCat}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={newQDiff} onValueChange={setNewQDiff}>
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DIFFICULTIES.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Button type="submit" variant="secondary">
+                      + Add
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {!started ? (
+            <div className="text-center">
+              <Button
+                onClick={() => {
+                  setStarted(true);
+                  setSeconds(60);
+                }}
+                size="lg"
+                className="px-8 py-4"
+              >
+                Start Interview Session
+              </Button>
             </div>
           ) : (
-            <div className="text-red-600 font-semibold">
-              No questions match your filters. Add custom or reset filters.
-            </div>
-          )}
-
-          <Recorder
-            onTranscript={handleTranscript}
-            onSave={(blob) => {
-              setLastRecordingUrl(URL.createObjectURL(blob));
-            }}
-          />
-          <div className="flex flex-col gap-2 mt-4">
-            <label className="font-mono font-semibold" htmlFor="ai-answer">
-              Type or auto-transcribe your answer for AI feedback:
-            </label>
-            <textarea
-              id="ai-answer"
-              rows={4}
-              className="border rounded p-2 font-mono"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder="e.g. My name is... In my previous job..."
-              disabled={seconds > 0 && started}
-            />
-
-            <button
-              className="btn btn-blue"
-              onClick={handleAIFeedback}
-              disabled={isLoading || !answer.trim() || !question}
-            >
-              {isLoading ? "Getting AI Feedback..." : "Get AI Feedback"}
-            </button>
-            {feedbackErr && <div className="text-red-600">{feedbackErr}</div>}
-            {aiFeedback && (
-              <div className="bg-gray-50 border rounded p-3 mt-2 prose max-w-none">
-                <h3 className="font-semibold text-base mb-1">AI Feedback:</h3>
-                <MarkdownFeedback markdown={aiFeedback} />
+            <div className="space-y-6">
+              {/* Timer */}
+              <div className="text-center">
+                <div
+                  className={`text-4xl font-bold ${timeColor} transition-colors`}
+                >
+                  {Math.floor(seconds / 60)}:
+                  {(seconds % 60).toString().padStart(2, "0")}
+                </div>
+                <div className="text-sm text-gray-500 mt-1">Time remaining</div>
               </div>
-            )}
-          </div>
-          <button onClick={handleReset} className="btn btn-light mt-2">
-            Reset Session
-          </button>
-          {seconds === 0 && (
-            <div className="mt-2 text-green-600 font-bold">
-              Session complete! Review your recording above.
+
+              {/* Question Display */}
+              {question ? (
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                        Q
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="font-medium">
+                            Interview Question
+                          </span>
+                          <Badge variant="secondary">{question.category}</Badge>
+                          <Badge variant="outline">{question.difficulty}</Badge>
+                        </div>
+                        <p className="text-gray-800 text-lg leading-relaxed">
+                          {question.text}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    No questions match your filters. Add custom questions or
+                    reset filters.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Recorder
+                onTranscript={handleTranscript}
+                onSave={(blob) => {
+                  setLastRecordingUrl(URL.createObjectURL(blob));
+                }}
+              />
+
+              {/* Answer Input */}
+              <div className="space-y-3">
+                <Label
+                  htmlFor="ai-answer"
+                  className="font-semibold text-gray-900"
+                >
+                  Your Answer
+                </Label>
+                <Textarea
+                  ref={textAreaRef}
+                  id="ai-answer"
+                  rows={6}
+                  className="font-mono resize-none"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  placeholder="Type your answer here or use voice recording above..."
+                  disabled={seconds === 0 || !started}
+                />
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleAIFeedback}
+                    disabled={isLoading || !answer.trim() || !question}
+                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Analyzing...
+                      </>
+                    ) : (
+                      "Get AI Feedback"
+                    )}
+                  </Button>
+
+                  <Button onClick={handleReset} variant="outline">
+                    Reset Session
+                  </Button>
+                </div>
+
+                {feedbackErr && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{feedbackErr}</AlertDescription>
+                  </Alert>
+                )}
+
+                {aiFeedback && (
+                  <Card className="bg-green-50 border-green-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                          AI
+                        </div>
+                        <h3 className="font-bold text-green-900">
+                          Feedback & Suggestions
+                        </h3>
+                      </div>
+                      <div className="prose prose-sm max-w-none text-gray-800">
+                        <MarkdownFeedback markdown={aiFeedback} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {seconds === 0 && (
+                <Alert>
+                  <AlertDescription className="text-center font-semibold">
+                    🎉 Session Complete! Review your answer and get feedback
+                    above.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           )}
+
+          {/* History Navigation */}
+          <div className="mt-8 text-center">
+            <Button asChild variant="outline">
+              <Link href="/practice/history">View History</Link>
+            </Button>
+          </div>
         </div>
-      )}
-      {/* Optional: History link for navigation */}
-      <div className="mt-6 text-right">
-        <Button asChild variant="outline">
-          <Link href="/practice/history">View History</Link>
-        </Button>
       </div>
     </div>
   );
