@@ -147,20 +147,7 @@ export default function Practice() {
   // Pick a filtered question when session starts
   useEffect(() => {
     if (started && !question) {
-      const allQuestions = [...starterQuestions, ...customQuestions];
-      const choices = allQuestions.filter(
-        (q) =>
-          (filterCategory === "any" || q.category === filterCategory) &&
-          (filterDifficulty === "any" || q.difficulty === filterDifficulty)
-      );
-      const pick = choices.length
-        ? choices[Math.floor(Math.random() * choices.length)]
-        : null;
-      setQuestion(pick || null);
-      setAnswer("");
-      setAIFeedback(null);
-      setFeedbackErr("");
-      setLastRecordingUrl(undefined);
+      pickNewQuestion();
     }
   }, [started, question, filterCategory, filterDifficulty, customQuestions]);
 
@@ -170,6 +157,25 @@ export default function Practice() {
       textAreaRef.current.focus();
     }
   }, [started]);
+
+  function pickNewQuestion() {
+    const allQuestions = [...starterQuestions, ...customQuestions];
+    const choices = allQuestions.filter(
+      (q) =>
+        (filterCategory === "any" || q.category === filterCategory) &&
+        (filterDifficulty === "any" || q.difficulty === filterDifficulty)
+    );
+    const pick = choices.length
+      ? choices[Math.floor(Math.random() * choices.length)]
+      : null;
+    setQuestion(pick || null);
+    setAnswer("");
+    setAIFeedback(null);
+    setFeedbackErr("");
+    setLastRecordingUrl(undefined);
+    setSeconds(60);
+    setStarted(true);
+  }
 
   function handleReset() {
     setStarted(false);
@@ -192,6 +198,10 @@ export default function Practice() {
     setIsLoading(true);
     setFeedbackErr("");
     setAIFeedback(null);
+
+    // ✅ Stop the timer at current value
+    setStarted(false);
+
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
@@ -255,7 +265,7 @@ export default function Practice() {
           </h1>
 
           {/* -- Customization Controls -- */}
-          {!started && (
+          {!started && !question && (
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="text-lg">
@@ -263,6 +273,7 @@ export default function Practice() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Difficulty & Category */}
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="difficulty-select">Difficulty:</Label>
@@ -308,6 +319,7 @@ export default function Practice() {
                   </div>
                 </div>
 
+                {/* Add Custom Question */}
                 <form onSubmit={handleAddCustomQ} className="space-y-3">
                   <Label className="text-base font-semibold">
                     Add Your Own Question
@@ -354,16 +366,9 @@ export default function Practice() {
             </Card>
           )}
 
-          {!started ? (
+          {!started && !question ? (
             <div className="text-center">
-              <Button
-                onClick={() => {
-                  setStarted(true);
-                  setSeconds(60);
-                }}
-                size="lg"
-                className="px-8 py-4"
-              >
+              <Button onClick={pickNewQuestion} size="lg" className="px-8 py-4">
                 Start Interview Session
               </Button>
             </div>
@@ -412,11 +417,17 @@ export default function Practice() {
                 </Alert>
               )}
 
+              {/* Two clear options */}
+              <div className="text-sm text-gray-600 mb-2">
+                Choose one: <strong>Record (auto-transcribes)</strong> or{" "}
+                <strong>type your answer</strong>.
+              </div>
+
               <Recorder
                 onTranscript={handleTranscript}
-                onSave={(blob) => {
-                  setLastRecordingUrl(URL.createObjectURL(blob));
-                }}
+                onSave={(blob) =>
+                  setLastRecordingUrl(URL.createObjectURL(blob))
+                }
               />
 
               {/* Answer Input */}
@@ -435,10 +446,10 @@ export default function Practice() {
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
                   placeholder="Type your answer here or use voice recording above..."
-                  disabled={seconds === 0 || !started}
+                  disabled={!started}
                 />
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
                   <Button
                     onClick={handleAIFeedback}
                     disabled={isLoading || !answer.trim() || !question}
@@ -457,6 +468,13 @@ export default function Practice() {
                   <Button onClick={handleReset} variant="outline">
                     Reset Session
                   </Button>
+
+                  {/* ✅ Next Question Button (only if feedback is done) */}
+                  {aiFeedback && (
+                    <Button onClick={pickNewQuestion} variant="secondary">
+                      Next Question →
+                    </Button>
+                  )}
                 </div>
 
                 {feedbackErr && (
@@ -483,15 +501,6 @@ export default function Practice() {
                   </Card>
                 )}
               </div>
-
-              {seconds === 0 && (
-                <Alert>
-                  <AlertDescription className="text-center font-semibold">
-                    🎉 Session Complete! Review your answer and get feedback
-                    above.
-                  </AlertDescription>
-                </Alert>
-              )}
             </div>
           )}
 

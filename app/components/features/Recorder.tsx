@@ -3,7 +3,6 @@
 import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-// Props: allow parent to pass setAnswer for speech-to-text
 type Props = {
   onSave?: (blob: Blob) => void;
   onTranscript?: (transcript: string) => void;
@@ -16,10 +15,52 @@ export default function Recorder({ onSave, onTranscript }: Props) {
   const chunks = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Speech-to-text state
+  // Speech-to-text
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const recognitionRef = useRef<any>(null);
+  const transcriptRef = useRef<string>(""); // accumulated transcript
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  const speechSupported =
+    typeof window !== "undefined" &&
+    (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  function createRecognition(): SpeechRecognition | null {
+    if (!speechSupported) return null;
+
+    const SR =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (!SR) return null;
+
+    const rec: SpeechRecognition = new SR();
+    rec.lang = "en-US";
+    rec.continuous = true;
+    rec.interimResults = true;
+
+    rec.onstart = () => setIsTranscribing(true);
+
+    rec.onresult = (event: SpeechRecognitionEvent) => {
+      let delta = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          delta += result[0].transcript + " ";
+        }
+      }
+      if (delta) {
+        const merged = (transcriptRef.current + " " + delta).trim();
+        transcriptRef.current = merged;
+        setTranscript(merged);
+        onTranscript?.(merged);
+      }
+    };
+
+    rec.onerror = () => setIsTranscribing(false);
+    rec.onend = () => setIsTranscribing(false);
+
+    return rec;
+  }
 
   async function start() {
     try {
@@ -28,6 +69,7 @@ export default function Recorder({ onSave, onTranscript }: Props) {
         video: true,
       });
       streamRef.current = stream;
+
       const recorder = new MediaRecorder(stream);
       recorder.ondataavailable = (e) => chunks.current.push(e.data);
       recorder.onstop = () => {
@@ -38,8 +80,24 @@ export default function Recorder({ onSave, onTranscript }: Props) {
         stream.getTracks().forEach((t) => t.stop());
       };
       mediaRecorderRef.current = recorder;
+
+      transcriptRef.current = "";
+      setTranscript("");
+
       recorder.start();
       setIsRecording(true);
+
+      if (speechSupported) {
+        const rec = createRecognition();
+        if (rec) {
+          recognitionRef.current = rec;
+          try {
+            rec.start();
+          } catch {
+            // ignore double starts
+          }
+        }
+      }
     } catch (error) {
       console.error("Failed to start recording:", error);
       alert("Failed to access camera/microphone. Please check permissions.");
@@ -49,60 +107,52 @@ export default function Recorder({ onSave, onTranscript }: Props) {
   function stop() {
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+    }
   }
 
   function reset() {
     setMediaUrl(null);
     setIsRecording(false);
     setTranscript("");
+    transcriptRef.current = "";
     setIsTranscribing(false);
     chunks.current = [];
-  }
 
-  // Simple Speech-to-Text using Web Speech API
-  function startTranscribe() {
-    if (
-      typeof window === "undefined" ||
-      !(window as any).webkitSpeechRecognition
-    ) {
-      alert("Speech recognition not supported in this browser.");
-      return;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
     }
 
-    const SpeechRecognition =
-      (window as any).webkitSpeechRecognition ||
-      (window as any).SpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    setTranscript("");
-    setIsTranscribing(true);
-
-    recognition.onresult = (event: any) => {
-      const transcriptResult = Array.from(event.results)
-        .map((result: any) => result[0].transcript)
-        .join("");
-      setTranscript(transcriptResult);
-      onTranscript?.(transcriptResult);
-      setIsTranscribing(false);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
-      setIsTranscribing(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-  }
-
-  function stopTranscribe() {
-    recognitionRef.current?.stop();
-    setIsTranscribing(false);
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null;
+    }
   }
 
   return (
     <div className="w-full space-y-4 border rounded-lg p-6 bg-white shadow-sm">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-800">
+          Option 1: Record your answer (auto-transcribes)
+        </h3>
+        {!speechSupported && (
+          <span className="text-xs text-amber-600">
+            Note: Speech recognition not supported in this browser.
+          </span>
+        )}
+      </div>
+
       <div className="flex flex-wrap gap-3">
         {!isRecording ? (
           <Button
@@ -110,7 +160,7 @@ export default function Recorder({ onSave, onTranscript }: Props) {
             variant="default"
             size="default"
             aria-label="Start video and audio recording"
-            title="Start recording your interview answer"
+            title="Start recording your interview answer (auto-transcribes)"
           >
             🎥 Start Recording
           </Button>
@@ -120,7 +170,7 @@ export default function Recorder({ onSave, onTranscript }: Props) {
             variant="destructive"
             size="default"
             aria-label="Stop recording"
-            title="Stop the current recording"
+            title="Stop the current recording (transcription will finalize)"
           >
             ⏹️ Stop Recording
           </Button>
@@ -128,7 +178,7 @@ export default function Recorder({ onSave, onTranscript }: Props) {
 
         <Button
           onClick={reset}
-          disabled={!mediaUrl && !isRecording}
+          disabled={!mediaUrl && !isRecording && !transcript}
           variant="outline"
           size="default"
           aria-label="Reset recorder and clear all content"
@@ -136,9 +186,15 @@ export default function Recorder({ onSave, onTranscript }: Props) {
         >
           🗑️ Reset
         </Button>
+
+        {(isRecording || isTranscribing) && speechSupported && (
+          <div className="flex items-center gap-2 text-sm text-blue-600">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            {isRecording ? "Recording…" : "Processing…"} Auto-transcribing…
+          </div>
+        )}
       </div>
 
-      {/* Video playback */}
       {mediaUrl && (
         <div className="mt-4">
           <video
@@ -151,58 +207,28 @@ export default function Recorder({ onSave, onTranscript }: Props) {
         </div>
       )}
 
-      {/* Speech-to-Text Controls */}
-      <div className="border-t pt-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
-          Speech-to-Text Transcription
-        </h3>
-
-        <div className="flex flex-wrap gap-3 items-start">
-          {!isTranscribing ? (
-            <Button
-              onClick={startTranscribe}
-              variant="secondary"
-              size="default"
-              aria-label="Start speech-to-text transcription"
-              title="Begin converting your speech to text in real-time"
-            >
-              🎤 Start Transcription
-            </Button>
-          ) : (
-            <Button
-              onClick={stopTranscribe}
-              variant="outline"
-              size="default"
-              aria-label="Stop speech-to-text transcription"
-              title="Stop the speech recognition process"
-            >
-              ⏸️ Stop Transcription
-            </Button>
-          )}
-
-          {isTranscribing && (
-            <div className="flex items-center gap-2 text-sm text-blue-600">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              Listening...
-            </div>
-          )}
+      {transcript && (
+        <div className="mt-3 p-3 bg-gray-50 rounded-lg border">
+          <label className="text-xs font-medium text-gray-600 block mb-1">
+            Auto-transcribed Text (also placed in “Your Answer”):
+          </label>
+          <p
+            className="text-sm text-gray-800 leading-relaxed"
+            aria-label="Transcribed speech content"
+            title={transcript}
+          >
+            {transcript}
+          </p>
         </div>
+      )}
 
-        {/* Transcript Display */}
-        {transcript && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg border">
-            <label className="text-xs font-medium text-gray-600 block mb-1">
-              Transcribed Text:
-            </label>
-            <p
-              className="text-sm text-gray-800 leading-relaxed"
-              aria-label="Transcribed speech content"
-              title={transcript}
-            >
-              {transcript}
-            </p>
-          </div>
-        )}
+      <div className="border-t pt-4">
+        <h4 className="text-sm font-semibold text-gray-800">
+          Option 2: Type your answer instead
+        </h4>
+        <p className="text-xs text-gray-600">
+          You can ignore recording and just type in the “Your Answer” box below.
+        </p>
       </div>
     </div>
   );
