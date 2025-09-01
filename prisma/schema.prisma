@@ -63,9 +63,9 @@ model VerificationToken {
 model Question {
   id         String   @id @default(uuid())
   text       String
-  category   String
-  difficulty String
-  type       String // "behavioral", "technical", etc
+  category   String // e.g. Behavioral, Technical, System Design
+  difficulty String // Easy, Medium, Hard
+  source     String? // optional: e.g. "seed", "LeetCode", "GitHub"
   createdAt  DateTime @default(now())
 }
 
