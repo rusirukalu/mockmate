@@ -65,7 +65,7 @@ model Question {
   text       String
   category   String // e.g. Behavioral, Technical, System Design
   difficulty String // Easy, Medium, Hard
-  source     String? // optional: e.g. "seed", "LeetCode", "GitHub"
+  source     String? // Optional: LeetCode, Glassdoor, GitHub repo, etc
   createdAt  DateTime @default(now())
 }
 
