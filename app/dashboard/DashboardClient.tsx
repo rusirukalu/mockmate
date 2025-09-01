@@ -7,8 +7,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Bar,
-  BarChart,
   Pie,
   PieChart,
   Cell,
@@ -17,8 +15,19 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import MarkdownFeedback from "@/app/components/features/MarkdownFeedback";
 
+// --- Types ---
+interface Session {
+  timestamp: number;
+  category: string;
+  difficulty: string;
+  question: string;
+  answer: string;
+  aiFeedback?: string;
+  videoUrl?: string;
+}
+
 // Helper to get history from localStorage
-function getPracticeHistory() {
+function getPracticeHistory(): Session[] {
   if (typeof window === "undefined") return [];
   const stored = localStorage.getItem("practice-history");
   return stored ? JSON.parse(stored) : [];
@@ -27,46 +36,44 @@ function getPracticeHistory() {
 const colors = ["#60a5fa", "#f59e42", "#34d399"];
 
 export default function DashboardClient({ userEmail }: { userEmail: string }) {
-  // State for history, insights
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [topStrengths, setTopStrengths] = useState<string[]>([]);
   const [topImprovements, setTopImprovements] = useState<string[]>([]);
-  const [recentSession, setRecentSession] = useState<any | null>(null);
+  const [recentSession, setRecentSession] = useState<Session | null>(null);
 
-  // On mount: Get log and calculate
   useEffect(() => {
     const history = getPracticeHistory();
     setSessions(history);
-    if (history && history.length) {
-      // Show most recent session
+    if (history.length) {
       setRecentSession(history[history.length - 1]);
 
-      // Parse AI feedback markdown for all history (naive: just grab bullets from headings)
-      let strengths: string[] = [];
-      let improvements: string[] = [];
+      // Parse AI feedback markdown
+      const strengths: string[] = [];
+      const improvements: string[] = [];
       for (const s of history) {
         if (s.aiFeedback) {
           const sMatch = s.aiFeedback.match(/## Strengths\n((?:- .*\n?)+)/i);
           const iMatch = s.aiFeedback.match(
             /## Areas to Improve\n((?:- .*\n?)+)/i
           );
-          if (sMatch)
+          if (sMatch) {
             strengths.push(
               ...sMatch[1]
                 .trim()
                 .split("\n")
                 .map((l: string) => l.replace(/^- /, ""))
             );
-          if (iMatch)
+          }
+          if (iMatch) {
             improvements.push(
               ...iMatch[1]
                 .trim()
                 .split("\n")
                 .map((l: string) => l.replace(/^- /, ""))
             );
+          }
         }
       }
-      // Show 2 most common strengths and areas to improve
       function topN(arr: string[], n: number) {
         const freq = arr.reduce(
           (a, s) => ((a[s] = (a[s] || 0) + 1), a),
@@ -83,7 +90,7 @@ export default function DashboardClient({ userEmail }: { userEmail: string }) {
   }, []);
 
   // Chart data
-  const byType = (sessions || []).reduce((acc, curr) => {
+  const byType = sessions.reduce((acc, curr) => {
     if (!curr || !curr.question) return acc;
     acc[curr.category] = (acc[curr.category] || 0) + 1;
     return acc;
@@ -93,13 +100,8 @@ export default function DashboardClient({ userEmail }: { userEmail: string }) {
     value,
   }));
 
-  const overTime = (sessions || []).map((sess) => ({
-    date: new Date(sess.timestamp).toLocaleDateString(),
-    count: 1,
-  }));
-
-  // Show only unique dates (sessions per day)
-  const sessionsByDay = (sessions || []).reduce((acc, curr) => {
+  // Sessions per day
+  const sessionsByDay = sessions.reduce((acc, curr) => {
     const day = new Date(curr.timestamp).toLocaleDateString();
     acc[day] = (acc[day] || 0) + 1;
     return acc;
@@ -157,7 +159,6 @@ export default function DashboardClient({ userEmail }: { userEmail: string }) {
           </a>
         </div>
 
-        {/* Delete All Practice History Button */}
         <Button
           onClick={() => {
             if (
@@ -178,7 +179,7 @@ export default function DashboardClient({ userEmail }: { userEmail: string }) {
       </section>
 
       <div className="grid gap-8 md:grid-cols-2 mb-8">
-        {/* Sessions Over Time (Line) */}
+        {/* Sessions Over Time */}
         <div className="bg-white rounded border shadow p-4">
           <h2 className="font-semibold mb-2">Sessions Per Day</h2>
           <ResponsiveContainer width="100%" height={200}>
@@ -196,7 +197,7 @@ export default function DashboardClient({ userEmail }: { userEmail: string }) {
             </LineChart>
           </ResponsiveContainer>
         </div>
-        {/* Category Distribution (Pie) */}
+        {/* Category Distribution */}
         <div className="bg-white rounded border shadow p-4">
           <h2 className="font-semibold mb-2">Question Category Breakdown</h2>
           <ResponsiveContainer width="100%" height={200}>
@@ -218,7 +219,6 @@ export default function DashboardClient({ userEmail }: { userEmail: string }) {
         </div>
       </div>
 
-      {/* Highlight last session */}
       {recentSession && (
         <section className="mb-6">
           <div className="bg-white border shadow p-4 rounded">

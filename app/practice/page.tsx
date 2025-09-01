@@ -13,34 +13,30 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// ---------- LocalStorage history helper ----------
-function saveSessionToHistory({
-  question,
-  category,
-  difficulty,
-  videoUrl,
-  answer,
-  aiFeedback,
-}: {
+// ---------- Types ----------
+export interface Question {
+  id?: string; // optional if not in DB
+  text: string;
+  category: string;
+  difficulty: string;
+}
+
+export interface PracticeSession {
+  timestamp: number;
   question: string;
   category: string;
   difficulty: string;
   videoUrl?: string;
   answer: string;
   aiFeedback: string;
-}) {
+}
+
+// ---------- LocalStorage history helper ----------
+function saveSessionToHistory(session: PracticeSession) {
   if (typeof window === "undefined") return;
   const stored = localStorage.getItem("practice-history");
-  const sessions = stored ? JSON.parse(stored) : [];
-  sessions.push({
-    timestamp: Date.now(),
-    question,
-    category,
-    difficulty,
-    videoUrl,
-    answer,
-    aiFeedback,
-  });
+  const sessions: PracticeSession[] = stored ? JSON.parse(stored) : [];
+  sessions.push(session);
   localStorage.setItem("practice-history", JSON.stringify(sessions));
 }
 
@@ -51,7 +47,7 @@ export default function Practice() {
   const [filterCategory, setFilterCategory] = useState("any");
   const [started, setStarted] = useState(false);
   const [seconds, setSeconds] = useState(60);
-  const [question, setQuestion] = useState<any>(null);
+  const [question, setQuestion] = useState<Question | null>(null);
 
   const [answer, setAnswer] = useState("");
   const [aiFeedback, setAIFeedback] = useState<string | null>(null);
@@ -68,11 +64,11 @@ export default function Practice() {
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Fetch from DB
-  const { data: questions, error } = useSWR(
+  const { data: questions } = useSWR<Question[]>(
     `/api/questions?category=${filterCategory}&difficulty=${filterDifficulty}`,
     fetcher
   );
-  const allQuestions = questions || [];
+  const allQuestions: Question[] = questions || [];
 
   // Countdown
   useEffect(() => {
@@ -119,7 +115,7 @@ export default function Practice() {
     setIsLoading(true);
     setFeedbackErr("");
     setAIFeedback(null);
-    setStarted(false); // stop timer
+    setStarted(false);
 
     try {
       const res = await fetch("/api/feedback", {
@@ -132,6 +128,7 @@ export default function Practice() {
       setAIFeedback(data.feedback);
 
       saveSessionToHistory({
+        timestamp: Date.now(),
         question: question.text,
         category: question.category,
         difficulty: question.difficulty,
@@ -139,8 +136,10 @@ export default function Practice() {
         answer,
         aiFeedback: data.feedback,
       });
-    } catch (e: any) {
-      setFeedbackErr(e.message || "Error contacting AI service.");
+    } catch (e: unknown) {
+      setFeedbackErr(
+        e instanceof Error ? e.message : "Error contacting AI service."
+      );
     } finally {
       setIsLoading(false);
     }

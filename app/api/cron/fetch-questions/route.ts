@@ -1,4 +1,3 @@
-// app/api/cron/fetch-questions/route.ts
 import { NextResponse } from "next/server";
 import { fetchLeetCodeQuestions } from "@/scripts/fetchQuestions";
 import { fetchGithubQuestions } from "@/scripts/fetchGithubQuestions";
@@ -15,10 +14,10 @@ export async function GET() {
       leet: leet.length,
       github: gh.length,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Cron job failed:", err);
     return NextResponse.json(
-      { ok: false, error: err.message || "Failed to refresh" },
+      { ok: false, error: err instanceof Error ? err.message : "Failed to refresh" },
       { status: 500 }
     );
   }

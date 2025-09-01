@@ -1,4 +1,3 @@
-// app/api/feedback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getGeminiFeedback } from "@/lib/gemini";
 
@@ -13,10 +12,10 @@ export async function POST(req: NextRequest) {
     }
     const feedback = await getGeminiFeedback(question, answer);
     return NextResponse.json({ feedback });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Gemini feedback error:", e);
     return NextResponse.json(
-      { error: e.message || "Failed to get AI feedback" },
+      { error: e instanceof Error ? e.message : "Failed to get AI feedback" },
       { status: 500 }
     );
   }

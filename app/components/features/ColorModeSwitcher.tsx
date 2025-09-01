@@ -4,20 +4,17 @@ import { useEffect, useState } from "react";
 /**
  * Simple light/dark/theme toggle for accessibility.
  * Remembers user preference in localStorage.
- * Tailwind's 'dark:' class is supported out of the box in Next.js.
  */
 export default function ColorModeSwitcher() {
   const [mode, setMode] = useState<"light" | "dark" | "system">("system");
 
-  // Set initial mode from localStorage or system
   useEffect(() => {
-    let saved =
+    const saved =
       typeof window !== "undefined" ? localStorage.getItem("color-mode") : null;
     if (saved === "dark" || saved === "light") setMode(saved);
     else setMode("system");
   }, []);
 
-  // Watch for mode changes and update <html> class (Tailwind expects 'dark')
   useEffect(() => {
     if (typeof window === "undefined") return;
     const html = document.documentElement;

@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+
 export default function Error({
   error,
   reset,
@@ -22,9 +24,9 @@ export default function Error({
       >
         Try again
       </button>
-      <a href="/" className="text-blue-600 underline">
+      <Link href="/" className="text-blue-600 underline">
         Back to home
-      </a>
+      </Link>
     </div>
   );
 }

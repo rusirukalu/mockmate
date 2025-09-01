@@ -1,4 +1,3 @@
-// app/components/features/Recorder.tsx
 "use client";
 import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,11 @@ type Props = {
   onSave?: (blob: Blob) => void;
   onTranscript?: (transcript: string) => void;
 };
+
+// --- Type shims for SpeechRecognition ---
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognition;
+}
 
 export default function Recorder({ onSave, onTranscript }: Props) {
   const [isRecording, setIsRecording] = useState(false);
@@ -28,9 +32,7 @@ export default function Recorder({ onSave, onTranscript }: Props) {
   function createRecognition(): SpeechRecognition | null {
     if (!speechSupported) return null;
 
-    const SR =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return null;
 
     const rec: SpeechRecognition = new SR();
@@ -71,7 +73,7 @@ export default function Recorder({ onSave, onTranscript }: Props) {
       streamRef.current = stream;
 
       const recorder = new MediaRecorder(stream);
-      recorder.ondataavailable = (e) => chunks.current.push(e.data);
+      recorder.ondataavailable = (e: BlobEvent) => chunks.current.push(e.data);
       recorder.onstop = () => {
         const blob = new Blob(chunks.current, { type: "video/webm" });
         setMediaUrl(URL.createObjectURL(blob));

@@ -1,7 +1,7 @@
 export default function PrivacyPolicy() {
   return (
     <div className="max-w-2xl mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-4">Privacy & Data Policy</h1>
+      <h1 className="text-2xl font-bold mb-4">Privacy &amp; Data Policy</h1>
       <p className="mb-3 text-gray-700">
         <b>Your privacy matters.</b> We never use your answers, feedback, or
         email for advertising or profiling.
@@ -19,8 +19,8 @@ export default function PrivacyPolicy() {
           stored.
         </li>
         <li>
-          Want to fully remove your data? Use "Clear History" on the dashboard
-          or log out anytime.
+          Want to fully remove your data? Use &quot;Clear History&quot; on the
+          dashboard or log out anytime.
         </li>
       </ul>
       <p className="text-gray-500 text-sm">
