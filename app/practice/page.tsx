@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import useSWR from "swr";
 import Recorder from "@/app/components/features/Recorder";
 import MarkdownFeedback from "@/app/components/features/MarkdownFeedback";
 import CustomizationPanel from "@/app/components/practice/CustomizationPanel";
-import { starterQuestions } from "@/lib/questions";
 import { TIMER_BY_DIFFICULTY } from "@/lib/config";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -44,20 +44,14 @@ function saveSessionToHistory({
   localStorage.setItem("practice-history", JSON.stringify(sessions));
 }
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
 export default function Practice() {
-  const [customQuestions, setCustomQuestions] = useState<
-    { id: number; text: string; category: string; difficulty: string }[]
-  >([]);
   const [filterDifficulty, setFilterDifficulty] = useState("any");
   const [filterCategory, setFilterCategory] = useState("any");
   const [started, setStarted] = useState(false);
   const [seconds, setSeconds] = useState(60);
-  const [question, setQuestion] = useState<{
-    id: number;
-    text: string;
-    category: string;
-    difficulty: string;
-  } | null>(null);
+  const [question, setQuestion] = useState<any>(null);
 
   const [answer, setAnswer] = useState("");
   const [aiFeedback, setAIFeedback] = useState<string | null>(null);
@@ -73,6 +67,13 @@ export default function Practice() {
 
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // Fetch from DB
+  const { data: questions, error } = useSWR(
+    `/api/questions?category=${filterCategory}&difficulty=${filterDifficulty}`,
+    fetcher
+  );
+  const allQuestions = questions || [];
+
   // Countdown
   useEffect(() => {
     if (!started) return;
@@ -85,14 +86,8 @@ export default function Practice() {
   }, [started, seconds]);
 
   function pickNewQuestion() {
-    const all = [...starterQuestions, ...customQuestions];
-    const choices = all.filter(
-      (q) =>
-        (filterCategory === "any" || q.category === filterCategory) &&
-        (filterDifficulty === "any" || q.difficulty === filterDifficulty)
-    );
-    const pick = choices.length
-      ? choices[Math.floor(Math.random() * choices.length)]
+    const pick = allQuestions.length
+      ? allQuestions[Math.floor(Math.random() * allQuestions.length)]
       : null;
     setQuestion(pick);
     setAnswer("");
@@ -155,21 +150,6 @@ export default function Practice() {
     setAnswer(transcript);
   }
 
-  function handleAddCustomQ(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newQ.trim()) return;
-    setCustomQuestions((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        text: newQ.trim(),
-        category: newQCat,
-        difficulty: newQDiff,
-      },
-    ]);
-    setNewQ("");
-  }
-
   const timeColor =
     seconds <= 10
       ? "text-red-500"
@@ -198,7 +178,7 @@ export default function Practice() {
                 setNewQCat={setNewQCat}
                 newQDiff={newQDiff}
                 setNewQDiff={setNewQDiff}
-                handleAddCustomQ={handleAddCustomQ}
+                handleAddCustomQ={() => {}}
               />
               <div className="text-center">
                 <Button
