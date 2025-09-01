@@ -63,9 +63,10 @@ model VerificationToken {
 model Question {
   id         String   @id @default(uuid())
   text       String
-  category   String // e.g. Behavioral, Technical, System Design
+  category   String // Behavioral, Technical, System Design
   difficulty String // Easy, Medium, Hard
-  source     String? // Optional: LeetCode, Glassdoor, GitHub repo, etc
+  source     String // e.g. "leetcode", "system-design-primer"
+  url        String? // link back to original question if available
   createdAt  DateTime @default(now())
 }
 
